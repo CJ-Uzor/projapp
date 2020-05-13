@@ -1,4 +1,9 @@
 
 {% for project in projects %}
-<p>{{project.title.title()}}</p>
+    <div>
+        <p>
+            {{ project.title }} By <strong>{{ project.author.username }}</strong>
+            <br> <a href="{{ url_for('view_project', id=project.id) }}">view</a>
+        </p>
+    </div>
 {% endfor %}

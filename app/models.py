@@ -54,12 +54,12 @@ class User(UserMixin, TimestampMixin, db.Model):
         return self.followed.filter(
             followers.c.followed_id == user.id).count() > 0
 
-    def followed_posts(self):
-        followed = Post.query.join(
-            followers, (followers.c.followed_id == Post.user_id)).filter(
+    def followed_projects(self):
+        followed = Project.query.join(
+            followers, (followers.c.followed_id == Project.user_id)).filter(
                 followers.c.follower_id == self.id)
-        own = Post.query.filter_by(user_id=self.id)
-        return followed.union(own).order_by(Post.timestamp.desc())
+        own = Project.query.filter_by(user_id=self.id)
+        return followed.union(own).order_by(Project.created_at.desc())
 
 class Project(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -73,7 +73,6 @@ class Project(TimestampMixin, db.Model):
     def __repr__(self):
         return f'<Project {self.title}>'
 
-# add comment table
 
 @login.user_loader
 def load_user(id):

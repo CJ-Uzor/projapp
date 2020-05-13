@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+
+    <h2>{{ project.title }}</h2>
+    {% if current_user.username == project.author.username %}
+        <a href="{{ url_for('edit_project', id=project.id) }}">Edit</a> /
+        <a href="{{ url_for('delete_project', id=project.id) }}">Delete</a>
+    {% endif %}
+    <p>
+        By <a href="{{ url_for('user', username=project.author.username) }}">{{ project.author.username }}</a>,
+        <br>Starts: {{ project.sdate }}
+        <br>Ends {{ project.edate }}
+        <br>
+        <hr>
+        {{ project.body }}
+    </p>
+
+{% endblock %}
