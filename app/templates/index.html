@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h2>Hi, {{ current_user.username }}</h2>
+    {% for project in projects %}
+        <div>
+            <h3>{{ project.title }}</h3>
+            by <strong>{{ project.author.username }}</strong>
+            <p>{{ project.body }}</p>
+        </div>
+    {% endfor %}
+{% endblock %}
