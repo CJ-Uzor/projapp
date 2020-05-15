@@ -15,3 +15,8 @@ class Config(object):
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     ADMINS = ['superuser-or-admin-email@example.com']
+
+    # file storage
+    UPLOAD_FOLDER = basedir + '/app/static/docs'
+    ALLOWED_EXTENSIONS = {'doc', 'docx', 'pdf'}
+    MAX_CONTENT_LENGTH  = 16 * 1024 * 1024

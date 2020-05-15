@@ -1,20 +1,111 @@
 {% extends "base.html" %}
+{% import 'bootstrap/wtf.html' as wtf %}
 
 
-{% block content %}
-
-    <h2>{{ project.title }}</h2>
+{% block app_content %}
+    <div class="col-md-8">
+        <h1>{{ project.title }}</h1>
+        {% if current_user.username == project.author.username %}
+        <p style="float-right;">
+            <a href="{{ url_for('edit_project', id=project.id) }}">Edit</a> /
+            <a href="{{ url_for('delete_project', id=project.id) }}">Delete</a>
+        </p>
+        {% endif %}
+        <p>
+            By <a class="label label-danger" href="{{ url_for('user', username=project.author.username) }}">{{ project.author.username }}</a>,
+            <br>{{ moment(project.sdate).format('LL') }} -
+            {{ moment(project.edate).format('LL') }}
+            <br>
+        </p>
+        <h3>Description</h3>
+        <p>{{ project.body }}</p>
     {% if current_user.username == project.author.username %}
-        <a href="{{ url_for('edit_project', id=project.id) }}">Edit</a> /
-        <a href="{{ url_for('delete_project', id=project.id) }}">Delete</a>
-    {% endif %}
-    <p>
-        By <a href="{{ url_for('user', username=project.author.username) }}">{{ project.author.username }}</a>,
-        <br>Starts: {{ project.sdate }}
-        <br>Ends {{ project.edate }}
-        <br>
-        <hr>
-        {{ project.body }}
-    </p>
+    <hr>
+        <h3>Tasks</h3>
+        <form class="form" method="POST" role="form">
+            {{ tform.hidden_tag() }}
+            {{ wtf.form_errors(tform, hiddens="only") }}
+            {{ wtf.form_field(tform.task, class="form-control input-sm") }}
+            {{ wtf.form_field(tform.edate, class="form-control input-sm", size=10) }}
 
+            {{ wtf.form_field(tform.tsubmit, class="btn btn-primary btn-sm") }}
+        </form>
+        {% if project.todos and project.todos.count() > 0 %}
+        <br>
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Deadline</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in project.todos %}
+                        <tr>
+                            <td>{{ task.task }}</td>
+                            <td>{{ moment(task.edate).format('L') }}</td>
+                            <td>
+                                {% if task.is_done %}
+                                    <a href="{{ url_for('update_todos', id=task.id) }}">Unmark</a>
+                                {% else %}
+                                    <a href="{{ url_for('update_todos', id=task.id) }}">Mark</a>
+                                {% endif %}
+                                / <a href="#">Delete</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    {% endif %}
+    <hr>
+    <h4 class="text-right" id="comments-title"> {{ project.comments.count() }} Comments</h4>
+    {% if project.comments and project.comments.count() > 0 %}
+        <table class="table table-striped">
+        {% for comment in project.comments.all() %}
+            <tr>
+                <td width="50px">
+                    <a href="{{ url_for('user', username=comment.user.username) }}">
+                        <img src="{{ comment.user.avatar(50) }}" />
+                    </a>
+                </td>
+                <td>
+                    {% if comment.user.username == project.author.username %}
+                    <p><span class="label label-danger">{{ comment.user.username }}</span>
+                        said {{ moment(comment.created_at).fromNow() }}</p>
+                    {% else %}
+                    <p><span class="label label-primary">{{ comment.user.username }}</span>
+                        said {{ moment(comment.created_at).fromNow()  }}</p>
+                    {% endif %}
+                    <p>{{ comment.body }}</p>
+                </td>
+            </tr>
+        {% endfor %}
+        </table>
+    {% endif %}
+    <h3>Leave a comment</h3>
+    <hr>
+    {{ wtf.quick_form(form)}}
+    <br>
+    </div>
+    {% if current_user.username == project.author.username %}
+        <div class="col-md-4 well well-lg">
+            <h3>Artifacts</h3>
+            <form class="form" method="POST" role="form" enctype="multipart/form-data">
+                {{ tform.hidden_tag() }}
+                {{ wtf.form_errors(aform, hiddens="only") }}
+                {{ wtf.form_field(aform.name, class="form-control input-sm") }}
+                {{ wtf.form_field(aform.file, class="form-control input-sm") }}
+
+                {{ wtf.form_field(aform.asubmit, class="btn btn-primary btn-sm") }}
+            </form>
+            <hr>
+            {% if project.artifacts and project.artifacts.count() > 0 %}
+                {% for artifact in project.artifacts %}
+                    <p><a href="{{ url_for('download_file', file=artifact.file) }}" target="_blank">{{ artifact.name }}</a></p>
+                {% endfor %}
+            {% endif %}
+        </div>
+    {% endif %}
 {% endblock %}

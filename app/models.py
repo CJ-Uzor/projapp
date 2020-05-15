@@ -1,4 +1,6 @@
-from app import db, login
+from app import db, login, app
+from time import time
+import jwt
 from hashlib import md5
 from datetime import datetime
 from flask_login import UserMixin
@@ -14,6 +16,7 @@ class TimestampMixin(object):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
+
 class User(UserMixin, TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), index=True, unique=True)
@@ -22,6 +25,7 @@ class User(UserMixin, TimestampMixin, db.Model):
     projects = db.relationship('Project', backref='author', lazy='dynamic')
     about_me = db.Column(db.String(140))
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
+    comments = db.relationship('Comment', backref='user', lazy='dynamic')
 
     followed = db.relationship(
         'User', secondary=followers,
@@ -61,18 +65,68 @@ class User(UserMixin, TimestampMixin, db.Model):
         own = Project.query.filter_by(user_id=self.id)
         return followed.union(own).order_by(Project.created_at.desc())
 
+    def get_reset_password_token(self, expires_in=600):
+        return jwt.encode(
+            {'reset_password': self.id, 'exp': time() + expires_in},
+            app.config['SECRET_KEY'], algorithm='HS256').decode('utf-8')
+
+    @staticmethod
+    def verify_reset_password_token(token):
+        try:
+            id = jwt.decode(token, app.config['SECRET_KEY'],
+                            algorithms=['HS256'])['reset_password']
+        except:
+            return
+        return User.query.get(id)
+
+
 class Project(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
-    body = db.Column(db.String(500))
+    body = db.Column(db.String(2000))
     status = db.Column(db.Integer, default=0)
     sdate = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     edate = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    comments = db.relationship('Comment', backref='project', lazy='dynamic')
+    todos = db.relationship('Todo', backref='project', lazy='dynamic')
+    artifacts = db.relationship("Artifact", backref='project', lazy='dynamic')
 
     def __repr__(self):
         return f'<Project {self.title}>'
 
+
+class Comment(TimestampMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    body = db.Column(db.String(1000), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'))
+
+    def __repr__(self):
+        out = (self.body[:50] + '...') if len(self.body) > 50 else self.body
+        return f'<Comment {out}>'
+
+
+class Todo(TimestampMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    task = db.Column(db.String(140), nullable=False, index=True)
+    edate = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    is_done = db.Column(db.Boolean, default=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'))
+
+    def __repr__(self):
+        out = (self.task[:50] + '...') if len(self.task) > 50 else self.task
+        return f'<Todo {out}>'
+
+
+class Artifact(TimestampMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(140), index=True, nullable=False)
+    file = db.Column(db.String(60), index=True, nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'))
+
+    def __repr__(self):
+        return f'<Artifact: {self.name}>'
 
 @login.user_loader
 def load_user(id):

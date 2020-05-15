@@ -1,10 +1,14 @@
 from app import app, db
-from flask import render_template, flash, redirect, url_for, request
-from app.forms import LoginForm, RegistrationForm, EditProfileForm, ProjectForm, EditProjectForm
-from app.models import User, Project
+from flask import render_template, flash, redirect, url_for, request, current_app, send_from_directory
+from app.forms import LoginForm, RegistrationForm, EditProfileForm, \
+    ProjectForm, EditProjectForm, CommentForm, TodoForm, ArtifactForm, ResetPasswordRequestForm, ResetPasswordForm
+from app.models import User, Project, Comment, Todo, Artifact
 from werkzeug.urls import url_parse
 from flask_login import current_user, login_user, logout_user, login_required
 from datetime import datetime
+from funcs import save_file
+from config import Config
+import os
 
 
 @app.before_request
@@ -28,7 +32,7 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
-            flash('Invalid username or password')
+            flash('Invalid username or password', 'danger')
             return redirect(url_for('login'))
         login_user(user, remember=form.remember_me.data)
         next_page = request.args.get('next')
@@ -52,16 +56,45 @@ def register():
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
-        flash('Congratulations, you are now a registered user!')
+        flash('Congratulations, you are now a registered user!', 'success')
         return redirect(url_for('login'))
     return render_template('register.html', title='Register', form=form)
+
+@app.route('/reset_password_request', methods=['GET', 'POST'])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    form = ResetPasswordRequestForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            send_password_reset_email(user)
+        flash('Check your email for the instructions to reset your password')
+        return redirect(url_for('login'))
+    return render_template('reset_password_request.html',
+                           title='Reset Password', form=form)
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    user = User.verify_reset_password_token(token)
+    if not user:
+        return redirect(url_for('index'))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user.set_password(form.password.data)
+        db.session.commit()
+        flash('Your password has been reset.')
+        return redirect(url_for('login'))
+    return render_template('reset_password.html', form=form)
 
 @app.route('/user/<username>')
 @login_required
 def user(username):
     user = User.query.filter_by(username=username).first_or_404()
     projects = user.projects.order_by(Project.created_at.desc())
-    return render_template('user.html', user=user, projects=projects)
+    return render_template('user.html', title='Profile', user=user, projects=projects)
 
 @app.route('/edit_profile', methods=['GET', 'POST'])
 @login_required
@@ -136,11 +169,48 @@ def new_project():
         return redirect(url_for('view_project', id=new_id))
     return render_template('new_project.html', title='New project', form=form)
 
-@app.route('/projects/<id>')
+@app.route('/projects/<id>', methods=['GET', 'POST'])
 @login_required
 def view_project(id):
+    form = CommentForm()
+    aform = ArtifactForm()
     project = Project.query.get(id)
-    return render_template('view_project.html', title=project.title, project=project)
+    tform = TodoForm(pid = project.id)
+    if form.csubmit.data and form.validate():
+        comment = Comment(
+            body = form.body.data,
+            user_id = current_user.get_id(),
+            project_id = project.id
+        )
+        db.session.add(comment)
+        db.session.commit()
+        flash('Your comment has been submitted successfully')
+        return redirect(url_for('view_project', id=project.id))
+    if tform.tsubmit.data and tform.validate():
+        todo = Todo(
+            task = tform.task.data,
+            edate = tform.edate.data,
+            is_done = tform.is_done.data,
+            project_id = project.id
+        )
+        db.session.add(todo)
+        db.session.commit()
+        flash('Task has been added successfully')
+        return redirect(url_for('view_project', id=project.id))
+
+    if aform.asubmit.data and aform.validate():
+        file = request.files['file']
+        fname = save_file(file)
+        artifact = Artifact(
+            name = aform.name.data,
+            file = fname,
+            project_id = project.id
+        )
+        db.session.add(artifact)
+        db.session.commit()
+        flash('Artifact saved successfully')
+        return redirect(url_for('view_project', id=project.id))
+    return render_template('view_project.html', title=project.title, project=project, form=form, tform=tform, aform=aform)
 
 @app.route('/projects/<id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -172,3 +242,21 @@ def delete_project(id):
         flash('Project deleted successfully!')
         return redirect(url_for('index'))
     return redirect(url_for('view_project', id=id))
+
+@app.route('/todos/<id>', methods=['GET', 'POST'])
+@login_required
+def update_todos(id):
+    task = Todo.query.get(id)
+    if task.is_done:
+        task.is_done = False
+    else:
+        task.is_done = True
+    db.session.commit()
+    flash('Task updated successfully')
+    return redirect(url_for('view_project', id=task.project.id))
+
+@app.route('/download_file/<file>')
+@login_required
+def download_file(file):
+    uploads = os.path.join(current_app.root_path, Config.UPLOAD_FOLDER)
+    return send_from_directory(directory=uploads, filename=file)
