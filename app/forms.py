@@ -127,9 +127,7 @@ class TodoForm(FlaskForm):
 
     def validate_edate(form, field):
         project = Project.query.get(form.pid.data)
-        if field.data < project.sdate.date():
-            raise ValidationError('Make sure task end date is within the project start and end date!')
-        if field.data > project.edate.date():
+        if field.data < project.sdate.date() or field.data > project.edate.date():
             raise ValidationError('Make sure task end date is within the project start and end date!')
 
 

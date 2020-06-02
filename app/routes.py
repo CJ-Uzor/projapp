@@ -234,7 +234,7 @@ def edit_project(id):
         return redirect(url_for('view_project', id=project.id))
     return render_template('edit_project.html', title='Edit project', form=form)
 
-@app.route('/projects/<id>/delete', methods=['POST'])
+@app.route('/projects/<id>/delete', methods=['GET', 'POST'])
 @login_required
 def delete_project(id):
     if Project.query.filter_by(id=id).delete():
